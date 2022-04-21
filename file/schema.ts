@@ -1,5 +1,7 @@
 import { createModule, gql } from "graphql-modules"
+import { File } from "@prisma/client"
 import { prismaClient } from "../prisma"
+import { createFileRecord, CreateFileInput } from "./service"
 
 const prisma = prismaClient()
 export const fileModule = createModule({
@@ -15,9 +17,21 @@ export const fileModule = createModule({
         updatedAt: String!
         versions: [FileVersion]!
       }
-
+      input CreateFileInput {
+        name: String!
+        directoryId: ID!
+        mimeType: String!
+        size: Int!
+      }
+      type CreateFileResult {
+        file: File!
+        url: String
+      }
       extend type Query {
         getAllFiles: [File]!
+      }
+      extend type Mutation {
+        createFile(input: CreateFileInput!): CreateFileResult!
       }
     `,
   ],
@@ -25,6 +39,14 @@ export const fileModule = createModule({
     Query: {
       getAllFiles: async () => {
         return prisma.file.findMany()
+      },
+    },
+    Mutation: {
+      createFile: async (
+        _: unknown,
+        { input }: { input: CreateFileInput }
+      ): Promise<{ file: File; url: string }> => {
+        return createFileRecord(prisma, input)
       },
     },
   },
