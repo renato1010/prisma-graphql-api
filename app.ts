@@ -90,5 +90,4 @@ app.use(
 )
 
 app.listen(port, () => {
-  console.log(`Application running on port ${port}.`)
 })

@@ -3,7 +3,7 @@ import { dirname, join } from "path"
 import { DateTime } from "luxon"
 import { FakeAwsFile, FileBucket, SIGNED_URL_EXPIRES } from "./bucket"
 
-const appRoot = require.main?.path[0].split("node_modules")[0].slice(0, -1)
+const appRoot = require.main?.paths[0].split("node_modules")[0].slice(0, -1)
 // const rootPath = join(__dirname, "..")
 const rootDir = `${appRoot ?? "."}/.files`
 const baseUrl = `http://localhost:${process.env.LOCAL_PORT ?? 4000}/file`
@@ -41,15 +41,19 @@ export async function saveFile(
   file: FakeAwsFile
 ): Promise<string> {
   const { Body, ...info } = file
-  await writeFile(key, Body)
-  await writeFile(
-    `${key}.info`,
-    JSON.stringify({
-      ...info,
-      ContentLength: Body.byteLength,
-      LastModified: new Date(),
-    })
-  )
+  try {
+    await writeFile(key, Body)
+    await writeFile(
+      `${key}.info`,
+      JSON.stringify({
+        ...info,
+        ContentLength: Body.byteLength,
+        LastModified: new Date(),
+      })
+    )
+  } catch (error) {
+    throw new Error("Error saving file")
+  }
   return getSignedUrl("get", key)
 }
 
@@ -58,7 +62,9 @@ async function deleteObject(key: string): Promise<void> {
   await fs.unlink(getPath(key) + ".info")
 }
 
-export async function downloadLocalFile(signedUrl: string): Promise<FakeAwsFile> {
+export async function downloadLocalFile(
+  signedUrl: string
+): Promise<FakeAwsFile> {
   const key = validateSignedUrl("get", signedUrl)
   return await getObject(key)
 }
@@ -106,10 +112,12 @@ function validateSignedUrl(operation: "get" | "put", url: string) {
       key: string
       expires: number
     }
+    const dateTimeLocal = DateTime.local()
+    const dateTimeFromMillis = DateTime.fromMillis(signed.expires)
     if (signed.operation !== operation) {
-      throw new Error("Incorrecto operation")
+      throw new Error("Incorrect operation")
     }
-    if (DateTime.local() > DateTime.fromMillis(signed.expires)) {
+    if (dateTimeLocal > dateTimeFromMillis) {
       throw new Error("URL expired")
     }
     return signed.key
@@ -117,7 +125,7 @@ function validateSignedUrl(operation: "get" | "put", url: string) {
     if (error instanceof Error) {
       throw error
     } else {
-      throw new Error('Could not validate URL')
+      throw new Error("Could not validate URL")
     }
   }
 }

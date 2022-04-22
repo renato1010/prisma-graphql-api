@@ -1,9 +1,9 @@
 import { GetObjectOutput } from "@aws-sdk/client-s3"
 import { Duration } from "luxon"
-import { getLocalBucket } from './localBucket'
+import { getLocalBucket } from "./localBucket"
 import { getS3Bucket } from "./s3Bucket"
 
-export const SIGNED_URL_EXPIRES = Duration.fromObject({ minutes: 10 })
+export const SIGNED_URL_EXPIRES = Duration.fromObject({ minutes: 1000 })
 
 export type FakeAwsFile = Required<Pick<GetObjectOutput, "ContentType">> &
   Pick<GetObjectOutput, "ContentLength" | "LastModified"> & { Body: Buffer }
@@ -20,7 +20,7 @@ export interface FileBucket {
 
 const bucketId = process.env.AWS_BUCKET_NAME
 
-export function getBucket(): FileBucket | undefined {
+export function getBucket(): FileBucket {
   if (process.env.NODE_ENV === "development") {
     return getLocalBucket()
   } else if (bucketId) {
