@@ -9,6 +9,11 @@ import { fileModule } from "./file"
 import { fileVersionModule } from "./fileVersion"
 import { downloadLocalFile, uploadLocalFile } from "./bucket"
 
+export interface PaginationOptions {
+  pageLength: number
+  page: number
+}
+
 const mainModule = createModule({
   id: "main-module",
   dirname: __dirname,
@@ -20,7 +25,10 @@ const mainModule = createModule({
         createdAt: String!
         updatedAt: String!
       }
-
+      input PaginationInput {
+        page: Int!
+        pageLength: Int!
+      }
       type Query {
         searchFiles(query: String!): [FileNode]
       }
@@ -90,4 +98,5 @@ app.use(
 )
 
 app.listen(port, () => {
+  console.log(`app running on port ${port}`)
 })
