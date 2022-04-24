@@ -1,6 +1,11 @@
 import { createModule, gql } from "graphql-modules"
 import { prismaClient } from "../prisma"
-import { createDirectory } from "./service"
+import {
+  createDirectory,
+  deleteDirectory,
+  getDirectory,
+  renameDirectory,
+} from "./service"
 
 const prisma = prismaClient()
 export const directoryModule = createModule({
@@ -20,9 +25,12 @@ export const directoryModule = createModule({
 
       extend type Query {
         getAllDirectories: [Directory]!
+        getDirectory(id: ID!): Directory
       }
       type Mutation {
         createDirectory(name: String!, parentId: String!): Directory!
+        renameDirectory(id: ID!, newName: String): Directory
+        deleteDirectory(id: ID!): Boolean!
       }
     `,
   ],
@@ -31,6 +39,9 @@ export const directoryModule = createModule({
       getAllDirectories: () => {
         return prisma.directory.findMany()
       },
+      getDirectory: (_: unknown, { id }: { id: string }) => {
+        return getDirectory(prisma, id)
+      },
     },
     Mutation: {
       createDirectory: async (
@@ -38,6 +49,15 @@ export const directoryModule = createModule({
         { name, parentId }: { name: string; parentId: string }
       ) => {
         return await createDirectory(prisma, name, parentId)
+      },
+      renameDirectory: async (
+        _: unknown,
+        { id, newName }: { id: string; newName: string }
+      ) => {
+        return await renameDirectory(prisma, id, newName)
+      },
+      deleteDirectory: async (_: unknown, { id }: { id: string }) => {
+        return await deleteDirectory(prisma, id)
       },
     },
   },
