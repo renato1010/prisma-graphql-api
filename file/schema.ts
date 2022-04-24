@@ -1,7 +1,14 @@
 import { createModule, gql } from "graphql-modules"
 import { File } from "@prisma/client"
 import { prismaClient } from "../prisma"
-import { createFileRecord, CreateFileInput } from "./service"
+import {
+  createFileRecord,
+  CreateFileInput,
+  getFile,
+  moveFile,
+  renameFile,
+  deleteFile,
+} from "./service"
 
 const prisma = prismaClient()
 export const fileModule = createModule({
@@ -27,11 +34,16 @@ export const fileModule = createModule({
         file: File!
         url: String
       }
+
       extend type Query {
         getAllFiles: [File]!
+        getFile(id: ID!): File
       }
       extend type Mutation {
         createFile(input: CreateFileInput!): CreateFileResult!
+        moveFile(id: ID!, directoryId: ID!): File!
+        renameFile(id: ID!, newName: String!): File!
+        deleteFile(id: ID!): Boolean
       }
     `,
   ],
@@ -40,6 +52,9 @@ export const fileModule = createModule({
       getAllFiles: async () => {
         return prisma.file.findMany()
       },
+      getFile: async (_: unknown, { id }: { id: string }) => {
+        return await getFile(prisma, id)
+      },
     },
     Mutation: {
       createFile: async (
@@ -47,6 +62,21 @@ export const fileModule = createModule({
         { input }: { input: CreateFileInput }
       ): Promise<{ file: File; url: string }> => {
         return createFileRecord(prisma, input)
+      },
+      moveFile: async (
+        _: unknown,
+        { id, directoryId }: { id: string; directoryId: string }
+      ) => {
+        return await moveFile(prisma, id, directoryId)
+      },
+      renameFile: async (
+        _: unknown,
+        { id, newName }: { id: string; newName: string }
+      ) => {
+        return await renameFile(prisma, id, newName)
+      },
+      deleteFile: async (_: unknown, { id }: { id: string }) => {
+        return await deleteFile(prisma, id)
       },
     },
   },

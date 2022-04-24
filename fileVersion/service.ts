@@ -1,8 +1,7 @@
 import { FileVersion, Prisma, PrismaClient, File } from "@prisma/client"
 import { getBucket } from "../bucket"
 import { generateId } from "../utils/generators"
-import { PaginationOptions } from '../app'
-
+import { PaginationOptions } from "../app"
 
 const fileVersionInputFields = Prisma.validator<Prisma.FileVersionArgs>()({
   select: { fileId: true, name: true, mimeType: true, size: true },
@@ -71,10 +70,38 @@ export async function getFileVersions(
   return await client.fileVersion.findMany({
     ...(pagination
       ? {
-          skip: pagination.page * pagination.pageLength,
+          skip: (pagination.page -1) * pagination.pageLength,
           take: pagination.pageLength,
         }
       : {}),
     where: { fileId },
   })
+}
+
+export async function renameFileVersion(
+  client: PrismaClient,
+  fileVersionId: FileVersion["id"],
+  newName: FileVersion["name"]
+): Promise<FileVersion> {
+  const renamedFileVersion = await client.fileVersion.update({
+    where: { id: fileVersionId },
+    data: { name: newName },
+  })
+  return renamedFileVersion
+}
+
+export async function deleteFileVersion(
+  client: PrismaClient,
+  fileVersionId: FileVersion["id"]
+): Promise<boolean> {
+  try {
+    const version = await client.fileVersion.delete({
+      where: { id: fileVersionId },
+    })
+    // delete also the related file
+    await getBucket().deleteObject(version.key)
+    return true
+  } catch (error) {
+    throw new Error("Error deleting file version")
+  }
 }
