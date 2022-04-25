@@ -16,9 +16,14 @@ export async function createFileRecord(
 ): Promise<{ file: File; url: string }> {
   const { name, directoryId, mimeType, size, key: keyInput } = file
   const key = keyInput ?? generateId()
+  const directory = await client.directory.findUnique({
+    where: { id: directoryId },
+  })
+  const ancestors = directory?.ancestors ?? []
   const data = {
     name,
     directoryId,
+    ancestors: [...ancestors, directoryId],
     versions: {
       create: {
         name,
@@ -57,9 +62,19 @@ export async function moveFile(
     versions: FileVersion[]
   }
 > {
+  const directory = await client.directory.findUnique({
+    where: { id: moveToDirectoryId },
+  })
+  if (!directory) {
+    throw new Error(`Can't move to directory with ID=${moveToDirectoryId}`)
+  }
+  const ancestors = directory.ancestors
   const fileAndVersions = await client.file.update({
     where: { id },
-    data: { directoryId: moveToDirectoryId },
+    data: {
+      directoryId: moveToDirectoryId,
+      ancestors: [...ancestors, moveToDirectoryId],
+    },
     include: { versions: true },
   })
   return fileAndVersions
@@ -97,4 +112,14 @@ export async function deleteFile(
     console.error(error)
     return false
   }
+}
+
+export async function findFiles(
+  client: PrismaClient,
+  lookupName: string
+): Promise<File[]> {
+  return await client.file.findMany({
+    where: { name: { contains: lookupName, mode: "insensitive" } },
+    orderBy: [{ name: "asc" }],
+  })
 }

@@ -1,4 +1,8 @@
 import { Directory, PrismaClient } from "@prisma/client"
+import { deleteFile } from "../file"
+import { prismaClient } from "../prisma"
+
+const prisma = prismaClient()
 
 export async function createDirectory(
   client: PrismaClient,
@@ -8,7 +12,17 @@ export async function createDirectory(
   if (name.toLowerCase() === "root") {
     throw new Error("Can not create directory root")
   }
-  const directory = await client.directory.create({ data: { name, parentId } })
+  const parent = parentId
+    ? await client.directory.findUnique({ where: { id: parentId } })
+    : null
+  const ancestors = parent?.ancestors ?? []
+  const directory = await client.directory.create({
+    data: {
+      name,
+      parentId,
+      ancestors: [...ancestors, ...(parentId ? [parentId] : [])],
+    },
+  })
   return directory
 }
 
@@ -45,12 +59,35 @@ export async function renameDirectory(
 
 export async function deleteDirectory(
   client: PrismaClient,
-  id: string
+  id: Directory["id"]
 ): Promise<boolean> {
   try {
-    await client.directory.delete({ where: { id } })
+    // delete all files that has as an ancestor the directory
+    // that is subject to deletion
+    const relatedFiles = await client.file.findMany({
+      where: { ancestors: { has: id } },
+    })
+    for (const file of relatedFiles) {
+      await deleteFile(prisma, file.id)
+    }
+    // find all directories that has as an ancestor the
+    // directory to be deleted
+    await client.$transaction([
+      client.directory.deleteMany({ where: { ancestors: { has: id } } }),
+      client.directory.delete({ where: { id } }),
+    ])
     return true
   } catch (error) {
     return false
   }
+}
+
+export async function findDirectories(
+  client: PrismaClient,
+  lookupName: string
+): Promise<Directory[]> {
+  return await client.directory.findMany({
+    where: { name: { contains: lookupName, mode: "insensitive" } },
+    orderBy: [{ name: "asc" }],
+  })
 }
