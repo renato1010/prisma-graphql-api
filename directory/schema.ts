@@ -1,12 +1,16 @@
 import { Directory } from "@prisma/client"
+import { PaginationOptions } from "../app"
 import { createModule, gql } from "graphql-modules"
 import { prismaClient } from "../prisma"
 import {
   createDirectory,
   deleteDirectory,
+  DirectoryContentsResult,
   getDirectory,
+  getDirectoryContents,
   moveDirectory,
   renameDirectory,
+  Sort,
 } from "./service"
 
 const prisma = prismaClient()
@@ -25,10 +29,25 @@ export const directoryModule = createModule({
         createdAt: String!
         updatedAt: String!
       }
+      type DirectoryContentsResult {
+        id: String!
+        name: String!
+        mimeType: String!
+        size: Int!
+        key: String!
+        createdAt: String!
+        updatedAt: String!
+        type: String!
+      }
 
       extend type Query {
         getAllDirectories: [Directory]!
         getDirectory(id: ID!): Directory
+        getDirectoryContents(
+          id: ID!
+          pagination: PaginationInput
+          sort: SortInput
+        ): [DirectoryContentsResult]
       }
       type Mutation {
         createDirectory(name: String!, parentId: String!): Directory!
@@ -45,6 +64,20 @@ export const directoryModule = createModule({
       },
       getDirectory: (_: unknown, { id }: { id: string }) => {
         return getDirectory(prisma, id)
+      },
+      getDirectoryContents: async (
+        _: unknown,
+        {
+          id,
+          pagination,
+          sort,
+        }: {
+          id: Directory["id"]
+          pagination?: PaginationOptions
+          sort?: Sort
+        }
+      ): Promise<DirectoryContentsResult[]> => {
+        return await getDirectoryContents(prisma, id, pagination, sort)
       },
     },
     Mutation: {

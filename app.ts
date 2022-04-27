@@ -32,6 +32,14 @@ const mainModule = createModule({
         page: Int!
         pageLength: Int!
       }
+      input SortInput {
+        field: String!
+        direction: SortDirection
+      }
+      enum SortDirection {
+        ASC
+        DESC
+      }
       type Query {
         searchFiles(query: String!): [FileNode]
       }
