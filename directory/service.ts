@@ -1,4 +1,4 @@
-import { Directory, PrismaClient } from "@prisma/client"
+import { Directory, PrismaClient, Prisma } from "@prisma/client"
 import { PaginationOptions } from "../app"
 import { deleteFile } from "../file"
 import { prismaClient } from "../prisma"
@@ -54,6 +54,72 @@ export async function getDirectory(
     where: { id: directoryId },
     include: { files: true, directories: true },
   })
+}
+
+type RawResult = Array<
+  Omit<DirectoryContentsResult, "type"> & { type: "1" | "2" }
+>
+
+export async function getDirectoryContentsRaw(
+  client: PrismaClient,
+  id: Directory["id"],
+  pagination?: PaginationOptions,
+  sort?: Sort
+): Promise<DirectoryContentsResult[]> {
+  const { field = "name", direction = "ASC" } = sort ?? {}
+  const { page = 1, pageLength = 20 } = pagination ?? {}
+
+  const mainQuery = Prisma.sql`
+      SELECT f.id, f.name, f.ancestors, f."mimeType", f.size, f.key, EXTRACT(EPOCH FROM f."createdAt") as "createdAt", EXTRACT(EPOCH FROM f."updatedAt") as "updatedAt", '2' as type from
+      (SELECT DISTINCT ON (files.id) * from files
+        INNER JOIN (SELECT "fileId", "mimeType", size, key, "createdAt" as created_at from file_versions) as fv
+          ON fv."fileId" = files.id
+        ORDER BY files.id, fv.created_at DESC) as f
+    WHERE ${id} = ANY(ancestors)
+    UNION ALL
+    SELECT d.id, d.name, d.ancestors, '' as "mimeType", 0 as size, '' as key, EXTRACT(EPOCH FROM d."createdAt") as "createdAt", EXTRACT(EPOCH FROM d."updatedAt") as "updatedAt", '1' as type FROM directories d
+    WHERE ${id} = ANY(ancestors)`
+
+  const paginationSql = Prisma.sql`LIMIT ${pageLength} OFFSET ${
+    pageLength * (page - 1)
+  }`
+
+  const directionSql = direction === "DESC" ? Prisma.sql`DESC` : Prisma.empty
+
+  const results =
+    field === "name"
+      ? await client.$queryRaw<RawResult>`
+      ${mainQuery}
+        ORDER BY name ${directionSql}
+      ${paginationSql}
+    `
+      : field === "size"
+      ? await client.$queryRaw<RawResult>`
+      ${mainQuery}
+        ORDER BY type, size, name ${directionSql}
+      ${paginationSql}
+    `
+      : field === "createdAt"
+      ? await client.$queryRaw<RawResult>`
+      ${mainQuery}
+        ORDER BY type, "createdAt" ${directionSql}
+      ${paginationSql}
+    `
+      : field === "updatedAt"
+      ? await client.$queryRaw<RawResult>`
+      ${mainQuery}
+        ORDER BY type, "updatedAt" ${directionSql}
+      ${paginationSql}
+    `
+      : await client.$queryRaw<RawResult>`
+      ${mainQuery}
+        ORDER BY name ${directionSql}
+      ${paginationSql}
+    `
+  return results.map((result) => ({
+    ...result,
+    type: result.type === "1" ? "Directory" : "File",
+  }))
 }
 
 export async function getDirectoryContents(
@@ -138,6 +204,29 @@ export async function getDirectoryContents(
     (page - 1) * pageLength + pageLength
   )
   return paginatedContents
+}
+
+export async function countDirectoryChildren(
+  client: PrismaClient,
+  directoryId: Directory["id"]
+): Promise<number> {
+  const [files, directories] = await client.$transaction([
+    client.file.count({ where: { ancestors: { has: directoryId } } }),
+    client.directory.count({ where: { ancestors: { has: directoryId } } }),
+  ])
+  return files + directories
+}
+export async function getDirectorySize(
+  client: PrismaClient,
+  directoryId: Directory["id"]
+): Promise<number | null> {
+  const {
+    _sum: { size },
+  } = await client.fileVersion.aggregate({
+    _sum: { size: true },
+    where: { file: { ancestors: { has: directoryId } } },
+  })
+  return size
 }
 export async function renameDirectory(
   client: PrismaClient,

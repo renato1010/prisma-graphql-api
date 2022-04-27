@@ -3,11 +3,14 @@ import { PaginationOptions } from "../app"
 import { createModule, gql } from "graphql-modules"
 import { prismaClient } from "../prisma"
 import {
+  countDirectoryChildren,
   createDirectory,
   deleteDirectory,
   DirectoryContentsResult,
   getDirectory,
   getDirectoryContents,
+  getDirectoryContentsRaw,
+  getDirectorySize,
   moveDirectory,
   renameDirectory,
   Sort,
@@ -28,6 +31,8 @@ export const directoryModule = createModule({
         directories: [Directory]!
         createdAt: String!
         updatedAt: String!
+        children: Int!
+        size: Int
       }
       type DirectoryContentsResult {
         id: String!
@@ -48,6 +53,13 @@ export const directoryModule = createModule({
           pagination: PaginationInput
           sort: SortInput
         ): [DirectoryContentsResult]
+        getDirectoryContentsRaw(
+          id: ID!
+          pagination: PaginationInput
+          sort: SortInput
+        ): [DirectoryContentsResult]
+        countDirectoryChildren(id: ID!): Int!
+        getDirectorySize(id: ID!): Int!
       }
       type Mutation {
         createDirectory(name: String!, parentId: String!): Directory!
@@ -58,6 +70,14 @@ export const directoryModule = createModule({
     `,
   ],
   resolvers: {
+    Directory: {
+      children: async ({ id }: { id: string }): Promise<number> => {
+        return await countDirectoryChildren(prismaClient(), id)
+      },
+      size: async ({ id }: { id: string }): Promise<number | null> => {
+        return await getDirectorySize(prismaClient(), id)
+      },
+    },
     Query: {
       getAllDirectories: () => {
         return prisma.directory.findMany()
@@ -78,6 +98,20 @@ export const directoryModule = createModule({
         }
       ): Promise<DirectoryContentsResult[]> => {
         return await getDirectoryContents(prisma, id, pagination, sort)
+      },
+      getDirectoryContentsRaw: async (
+        _: unknown,
+        {
+          id,
+          pagination,
+          sort,
+        }: {
+          id: Directory["id"]
+          pagination?: PaginationOptions
+          sort?: Sort
+        }
+      ): Promise<DirectoryContentsResult[]> => {
+        return await getDirectoryContentsRaw(prisma, id, pagination, sort)
       },
     },
     Mutation: {
