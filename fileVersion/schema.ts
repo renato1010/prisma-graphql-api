@@ -27,6 +27,7 @@ export const fileVersionModule = createModule({
         fileId: ID!
         createdAt: String!
         updatedAt: String!
+        deletedAt: String
       }
 
       input CreateFileVersionInput {
@@ -70,7 +71,7 @@ export const fileVersionModule = createModule({
   resolvers: {
     Query: {
       getAllFileVersions: () => {
-        return prisma.fileVersion.findMany()
+        return prisma.fileVersion.findMany({ include: {} })
       },
       getFileVersion: async (_: unknown, { id }: { id: string }) => {
         return await getFileVersion(prisma, id)

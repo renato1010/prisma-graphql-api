@@ -31,6 +31,7 @@ export const directoryModule = createModule({
         directories: [Directory]!
         createdAt: String!
         updatedAt: String!
+        deletedAt: String
         children: Int!
         size: Int
       }
@@ -72,10 +73,10 @@ export const directoryModule = createModule({
   resolvers: {
     Directory: {
       children: async ({ id }: { id: string }): Promise<number> => {
-        return await countDirectoryChildren(prismaClient(), id)
+        return await countDirectoryChildren(prisma, id)
       },
       size: async ({ id }: { id: string }): Promise<number | null> => {
-        return await getDirectorySize(prismaClient(), id)
+        return await getDirectorySize(prisma, id)
       },
     },
     Query: {

@@ -70,11 +70,11 @@ export async function getFileVersions(
   return await client.fileVersion.findMany({
     ...(pagination
       ? {
-          skip: (pagination.page -1) * pagination.pageLength,
+          skip: (pagination.page - 1) * pagination.pageLength,
           take: pagination.pageLength,
         }
       : {}),
-    where: { fileId },
+    where: { fileId, deletedAt: null },
   })
 }
 
@@ -95,11 +95,11 @@ export async function deleteFileVersion(
   fileVersionId: FileVersion["id"]
 ): Promise<boolean> {
   try {
-    const version = await client.fileVersion.delete({
+    await client.fileVersion.delete({
       where: { id: fileVersionId },
     })
-    // delete also the related file
-    await getBucket().deleteObject(version.key)
+    // not yet decided if wanted to keep bucket when soft delete
+    // await getBucket().deleteObject(version.key)
     return true
   } catch (error) {
     throw new Error("Error deleting file version")

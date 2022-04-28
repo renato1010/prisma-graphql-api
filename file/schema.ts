@@ -23,6 +23,7 @@ export const fileModule = createModule({
         ancestors: [String]
         createdAt: String!
         updatedAt: String!
+        deletedAt: String
         versions: [FileVersion]!
       }
       input CreateFileInput {
@@ -51,7 +52,7 @@ export const fileModule = createModule({
   resolvers: {
     Query: {
       getAllFiles: async () => {
-        return prisma.file.findMany()
+        return prisma.file.findMany({ include: { versions: true } })
       },
       getFile: async (_: unknown, { id }: { id: string }) => {
         return await getFile(prisma, id)

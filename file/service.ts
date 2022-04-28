@@ -49,7 +49,7 @@ export async function getFile(
   console.log({ id })
   return await client.file.findUnique({
     where: { id },
-    include: { versions: true },
+    include: { versions: { where: { deletedAt: null } } },
   })
 }
 
@@ -97,16 +97,16 @@ export async function deleteFile(
   id: string
 ): Promise<boolean> {
   try {
-    const fileVersions = await client.file
+    await client.file
       .findUnique({ where: { id } })
       .versions()
     await client.$transaction([
-      client.fileVersion.deleteMany({ where: { fileId: id } }),
+      client.fileVersion.deleteMany({ where: { fileId: id, deletedAt: null } }),
       client.file.delete({ where: { id } }),
     ])
-    for (const version of fileVersions) {
-      await getBucket().deleteObject(version.key)
-    }
+    // for (const version of fileVersions) {
+    //   await getBucket().deleteObject(version.key)
+    // }
     return true
   } catch (error) {
     console.error(error)
@@ -120,6 +120,7 @@ export async function findFiles(
 ): Promise<File[]> {
   return await client.file.findMany({
     where: { name: { contains: lookupName, mode: "insensitive" } },
+    include: { versions: { where: { deletedAt: null } } },
     orderBy: [{ name: "asc" }],
   })
 }
